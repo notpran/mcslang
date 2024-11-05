@@ -1,5 +1,8 @@
-this language has **no real-world purpose** unless you are a minecraft fan :) (jk). 
 made this cuz i was bored, thanks to chatgpt for fixing some bugs and errors tho
+
+### ⚠️ caution! ⚠️
+this language has **no real-world purpose** unless you are a minecraft fan :) (jk).
+and also, this language **CANNOT BE USED FOR MINECRAFT**[for creating plugins,mods,datapacks etc etc] its just a language like python which i referenced with minecraft in javascript
 
 # about
 MCS stands for minecraft script. its a language sorta like python but its minecraft referenced!
