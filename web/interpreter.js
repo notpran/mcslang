@@ -5,7 +5,7 @@ class MCSInterpreter {
       this.functions = {};
       this.output = "";
       this.currentLine = 0;
-      this.lastExecifResult = false; // Track the result of the last `execif`
+      this.lastExecifResult = false; 
   }
 
   run() {
@@ -18,10 +18,10 @@ class MCSInterpreter {
   }
 
   processLine(line) {
-      if (line.startsWith("::") || line === "") return; // Comments or empty lines
+      if (line.startsWith("::") || line === "") return;
 
       if (line.includes("::")) {
-          line = line.split("::")[0].trim(); // Remove inline comments
+          line = line.split("::")[0].trim();
       }
 
       if (line.startsWith("place ")) {
@@ -41,10 +41,10 @@ class MCSInterpreter {
           const body = line.slice(conditionEnd + 1).trim();
 
           if (this.evaluate(condition)) {
-              this.lastExecifResult = true; // Track successful `execif`
+              this.lastExecifResult = true;
               this.processLine(body);
           } else {
-              this.lastExecifResult = false; // Track failed `execif`
+              this.lastExecifResult = false;
           }
           return;
       }
@@ -53,10 +53,8 @@ class MCSInterpreter {
           if (!this.lastExecifResult) {
               const elseBody = line.slice(8).trim();
               if (elseBody) {
-                  // Inline execelse
                   this.processLine(elseBody);
               } else {
-                  // Block execelse
                   const followingLine = this.code[this.currentLine + 1]?.trim();
                   if (followingLine) {
                       this.currentLine++;
@@ -148,7 +146,6 @@ class MCSInterpreter {
   }
 }
 
-// Import and Export Functionality
 document.getElementById("import").addEventListener("click", () => {
   const input = document.createElement("input");
   input.type = "file";
@@ -174,7 +171,6 @@ document.getElementById("export").addEventListener("click", () => {
   link.click();
 });
 
-// Dynamic Textarea Resizing and Line Counter
 const codeInput = document.getElementById("code");
 
 function autoResizeTextarea() {
@@ -190,7 +186,6 @@ document.addEventListener("DOMContentLoaded", () => {
   autoResizeTextarea();
 });
 
-// Run Button
 document.getElementById("run").addEventListener("click", () => {
   const code = codeInput.value;
   const interpreter = new MCSInterpreter(code);
