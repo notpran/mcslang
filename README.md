@@ -67,7 +67,7 @@ place "hey there " + player_name
 
 ### Conditionals
 
-Conditional statements use the `execif`  keywords. execif checks if a condition is true and executes the code after the colon.(btw the else statement is coming soon)
+Conditional statements use the `execif`  and `execelse` keywords. execif checks if a condition is true and executes the code after the colon. If the given condition is false, it optionally executes the execelse block.
 
 **Syntax:**
 
@@ -137,32 +137,64 @@ greet  :: Call the function
 # Example program
 
 ```
-block health = 50
-place "Initial player health: " + health
+:: Define some variables
+block player_health = 100
+block player_hunger = 75
+block has_weapon = true
+block is_nighttime = true
 
-block is_night = true
-execif is_night: place "It's nighttime. Stay alert!"
+:: Test conditions with execif and execelse
+execif player_health > 50: place "Player is healthy."
+execelse place "Player needs healing."
 
-:: Simulate health draining loop
-place "Entering a battle..."
-mine health > 0:
-  place "Player is fighting... Health: " + health
-  block health = health - 15
+execif has_weapon: place "You are armed and ready!"
+execelse
+place "You are defenseless!"
+
+execif is_nighttime: place "It's nighttime. Beware of mobs!"
+execelse
+place "It's daytime. You're safe."
+
+:: Loop to simulate hunger decreasing
+place "Simulating hunger decrease..."
+mine player_hunger > 0:
+    place "Hunger is at " + player_hunger
+    block player_hunger = player_hunger - 10
 stopmine
+place "You are now starving. Find food!"
 
-:: Define a heal function
-craft heal
-  block health = health + 30
+:: Define a function to restore health
+craft heal_player
+    execif player_health < 100:
+        block player_health = 100
+        place "You have been healed to full health!"
+    execelse place "You are already at full health."
 crafted
 
-:: Use the heal function
-place "After battle, healing..."
-heal
-place "Player's health after healing: " + health
+:: Test the heal_player function
+place "Current health: " + player_health
+block player_health = 45
+place "You took damage! Current health: " + player_health
+heal_player
+heal_player
 
-:: Another variable and condition example
-block has_shield = false
-execif has_shield: place "Player has a shield for extra protection."
+:: Another function: simulate a fight
+craft simulate_fight
+    place "A mob appears!"
+    execif has_weapon:
+        place "You fought bravely and defeated the mob!"
+    execelse
+        place "You ran away to avoid certain death!"
+crafted
+
+simulate_fight
+
+:: Final print to show all stats
+place "Game Over Stats:"
+place "Health: " + player_health
+place "Hunger: " + player_hunger
+place "Armed: " + has_weapon
+place "Nighttime: " + is_nighttime
 ```
 and thats it! more updates coming soon
 
