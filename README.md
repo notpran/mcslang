@@ -73,6 +73,9 @@ Conditional statements use the `execif`  and `execelse` keywords. execif checks 
 
 ```
 execif <condition>: <statement>
+
+:: execelse is optional
+execelse <statement>
 ```
 
 - **condition**: A comparison (e.g., ==, !=, <, >, <=, >=) or a boolean expression.
@@ -84,6 +87,7 @@ execif <condition>: <statement>
 block player_health = 20
 
 execif player_health > 0: place "Player is alive!"
+execelse place "Player is dead :("
 ```
 
 ### Loops
