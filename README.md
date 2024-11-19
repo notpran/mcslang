@@ -13,7 +13,7 @@ MCS stands for minecraft script. its a language sorta like python but its minecr
 - then in cmd run `pip install eel`
 - then **Download the required files from this page**, extract it and run the `run.py` or go to web then run the main.html file
 - if u ran the python file, a window will open up[happy scripting!]
-- if you ran the html file, it would open up in your default browser[happy coding!!] 
+- if you ran the html file, it would open up in your default browser[happy scripting!!] 
 
 # How to code
 
@@ -200,6 +200,16 @@ place "Hunger: " + player_hunger
 place "Armed: " + has_weapon
 place "Nighttime: " + is_nighttime
 ```
-and thats it! more updates coming soon
+# Importing and exporting code
+
+### importing
+
+simply click on the green `import` button below the output box and choose a place to save the `.mcslang` file. this file can be opened and edited by **any** file editor
+
+### exporting
+
+simply click on the green `export` button below the output box and choose a compatable `.mcslang` file. whatever is in the file will be loaded into the input box where you can run or edit it!
+
+and thats it for now! more updates coming soon
 
 
