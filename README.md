@@ -22,7 +22,7 @@ MCS stands for minecraft script. its a language sorta like python but its minecr
 **Statements**: Each statement or command is on **a new line**. <br>
 **Whitespace**: Extra whitespace is **allowed**, but commands should generally start at **the beginning of the line**.
 
-### Outputing text/printing
+### Outputing text/printing - NEW!
 
 Use the `place` command to display messages or variable values in the output area. Expressions within place can include **strings, variables/expressions, numbers, boolean values or a combination of these**.
 <br>
@@ -31,6 +31,7 @@ Use the `place` command to display messages or variable values in the output are
 place "Hello world!" 
 place 12345
 place true
+place 3 + 5 :: returns 8
 ```
 
 
@@ -114,16 +115,38 @@ mine cobble < 5:
 stopmine
 ```
 
-### Functions
+
+### Constants - NEW!
+
+To declare a constant variable, use the `ore` keyword.
+
+**Syntax:**
+
+```
+ore variable_name = expression
+```
+
+here, **variable_name** is the name of the constant (letters and underscores only) and **expression** is a number, string, boolean, or arithmetic expression.
+
+**example:**
+
+```
+ore version = "1.2"
+ore gravity = 9.8
+```
+
+### Functions - NEW!!
 
 Define functions with `craft` and end them with `crafted`. Functions allow reusable code blocks and can be called by their names after definition.
 
 **Syntax:**
 
 ```
-craft function_name
+craft function_name arg1 arg2.... etc
     statements
 crafted
+
+function_name value1 value2..... etc
 ```
 
 here, **function_name** is the name of the function, used to call it elsewhere in the code.
@@ -131,11 +154,36 @@ here, **function_name** is the name of the function, used to call it elsewhere i
 **Example:**
 
 ```
-craft greet
-    place "Hello, Adventurer!"
+craft greet name
+    place "Hello," + name + "!"
 crafted
 
-greet  :: Call the function
+greet "Steve" :: Call the function
+```
+
+### Importing functions from other .mcsfiles - NEW!
+
+You can now import and use function from other files by first, importing/creating a file and then using the `addmod` keyword to import all functions from it
+
+**Syntax:**
+
+```
+addmod "<filename>.mcslang"
+```
+where, <filename> is the name of the file you are importing from
+
+**Example:**
+
+```
+addmod "utilities.mcslang"
+
+greet "Alex"
+```
+(in utilities.mcslang)
+```
+craft greet name
+    place "Hi there, " + name
+crafted
 ```
 
 # Example program
