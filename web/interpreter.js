@@ -125,7 +125,6 @@ class MCSInterpreter {
             throw new Error(`Function '${funcName}' expects ${paramNames.length} arguments, got ${args.length}`);
         }
     
-        // Bind args into this.variables
         paramNames.forEach((name, index) => {
             this.variables[name] = args[index];
         });
@@ -140,12 +139,10 @@ class MCSInterpreter {
     evaluate(expression) {
         expression = expression.trim();
     
-        // If full expression is a simple string
         if (expression.startsWith('"') && expression.endsWith('"') && !expression.includes('+')) {
             return expression.slice(1, -1);
         }
     
-        // Handle + operator for strings and numbers
         if (expression.includes("+")) {
             const parts = expression.split("+").map(part => part.trim());
             return parts.map(part => this.evaluate(part)).join("");
