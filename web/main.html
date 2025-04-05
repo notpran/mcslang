@@ -2,92 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MCS Interpreter</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif; 
-      background-color: #121212; 
-      color: #ffffff; 
-      display: flex; 
-      justify-content: center; 
-      align-items: center; 
-      height: 100vh; 
-      margin: 0; 
-      flex-direction: column;
-    }
-    h1 {
-      color: #7bda72;
-    }
-    .container {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      width: 80%;
-    }
-    .input-container {
-      display: flex;
-      position: relative;
-      width: 100%;
-    }
-    #line-counter {
-      background-color: #23272a;
-      color: #ffffff;
-      padding: 10px;
-      border: 1px solid #7bda72;
-      border-right: none;
-      text-align: right;
-      font-family: monospace;
-      user-select: none;
-    }
-    textarea {
-      background-color: #23272a;
-      color: #ffffff;
-      border: 1px solid #7bda72;
-      width: 100%;
-      font-family: monospace;
-      font-size: 14px;
-      resize: none;
-    }
-    #code {
-      margin-left: -1px;
-      padding: 10px;
-    }
-    #output {
-      margin-top: 20px;
-      padding: 10px;
-      height: auto;
-      overflow-y: auto;
-      resize: none;
-    }
-    button {
-      background-color: #7bda72;
-      color: #ffffff;
-      border: none;
-      padding: 10px 20px;
-      margin-top: 20px;
-      cursor: pointer;
-      font-size: 16px;
-    }
-    button:hover {
-      background-color: #7bda72;
-    }
-  </style>
+  <title>MCSLang Editor</title>
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <h1>MCS Interpreter</h1>
-  <div class="container">
-    <div class="input-container">
-      <textarea id="code" rows="10" placeholder="Write your MCS code here..."></textarea>
+  <div id="header">
+    <h1>MCSLang Studio</h1>
+  </div>
+  <div id="tab-bar"></div>
+  <div id="editor-container">
+    <div id="tabs"></div>
+    <textarea id="code" placeholder="Write your MCS script here..."></textarea>
+
+    <div id="controls">
+        <button id="newFile">New File</button>
+        <button id="importFile">Import File</button>
+        <button id="saveFile">Save File</button>
+        <button id="run">Run</button>
     </div>
-    <button id="run">Run Code</button>
-    <textarea id="output" rows="10" readonly placeholder="Output will appear here..."></textarea>
-  </div>
-  <div id="file-buttons">
-    <button id="import">Import</button>
-    <button id="export">Export</button>
-  </div>
-  
+
+    <textarea id="output" placeholder="Output will appear here..." readonly></textarea>
+</div>
+
   <script src="interpreter.js"></script>
+  <script src="editor.js"></script>
 </body>
 </html>
