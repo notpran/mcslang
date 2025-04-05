@@ -43,7 +43,7 @@ greet "Steve"
 greet "Alex"
 
 :: Use imported file
-addmod "tools.mcslang"
+addmod "tools_examplescript.mcslang"
 
 :: Call imported function
 mineblocks "Diamond"
