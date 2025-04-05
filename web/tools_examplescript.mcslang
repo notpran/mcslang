@@ -1,0 +1,8 @@
+:: Example of exporting functions from another file
+
+craft mineblocks item
+    place "Mining for " + item + "..."
+    block found = true
+    execif found: place item + " found!"
+    execelse place item + " not found :("
+crafted
