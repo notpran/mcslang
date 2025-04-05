@@ -1,11 +1,13 @@
 class MCSInterpreter {
-    constructor(code) {
+    constructor(code, fileSystem = {}) {
         this.code = code.split("\n");
         this.variables = {};
+        this.constants = new Set();
         this.functions = {};
+        this.fileSystem = fileSystem;
         this.output = "";
         this.currentLine = 0;
-        this.lastExecifResult = false; // Track the result of the last `execif`
+        this.lastExecifResult = false;
     }
 
     run() {
@@ -14,35 +16,38 @@ class MCSInterpreter {
             this.processLine(line);
             this.currentLine++;
         }
-        return this.output;
+        return this.output.trim();
     }
 
     processLine(line) {
-        if (line.startsWith("::") || line === "") return;
-
-        if (line.includes("::")) {
-            line = line.split("::")[0].trim();
-        }
+        if (line === "" || line.startsWith("::")) return;
+        if (line.includes("::")) line = line.split("::")[0].trim();
 
         if (line.startsWith("place ")) {
             this.output += this.evaluate(line.slice(6)) + "\n";
             return;
         }
 
+        if (line.startsWith("ore ")) {
+            const [_, varName, expression] = line.match(/ore\s+(\w+)\s*=\s*(.*)/);
+            if (this.variables[varName]) throw new Error(`Cannot redeclare constant '${varName}'`);
+            this.variables[varName] = this.evaluate(expression);
+            this.constants.add(varName);
+            return;
+        }
+
         if (line.startsWith("block ")) {
             const [_, varName, expression] = line.match(/block\s+(\w+)\s*=\s*(.*)/);
+            if (this.constants.has(varName)) throw new Error(`Cannot modify constant '${varName}'`);
             this.variables[varName] = this.evaluate(expression);
             return;
         }
 
         if (line.startsWith("execif ")) {
-            const conditionEnd = line.indexOf(":");
-            const condition = line.slice(7, conditionEnd).trim();
-            const body = line.slice(conditionEnd + 1).trim();
-
+            const [_, condition, action] = line.match(/execif\s+(.*):\s*(.*)/);
             if (this.evaluate(condition)) {
                 this.lastExecifResult = true;
-                this.processLine(body);
+                this.processLine(action);
             } else {
                 this.lastExecifResult = false;
             }
@@ -51,31 +56,22 @@ class MCSInterpreter {
 
         if (line.startsWith("execelse")) {
             if (!this.lastExecifResult) {
-                const elseBody = line.slice(8).trim();
-                if (elseBody) {
-                    // Inline execelse
-                    this.processLine(elseBody);
-                } else {
-                    // Block execelse
-                    const followingLine = this.code[this.currentLine + 1]?.trim();
-                    if (followingLine) {
-                        this.currentLine++;
-                        this.processLine(followingLine);
-                    }
+                const elseAction = line.replace("execelse", "").trim();
+                if (elseAction) this.processLine(elseAction);
+                else {
+                    const nextLine = this.code[++this.currentLine]?.trim();
+                    if (nextLine) this.processLine(nextLine);
                 }
             }
             return;
         }
 
         if (line.startsWith("mine ")) {
-            const conditionEnd = line.indexOf(":");
-            const condition = line.slice(5, conditionEnd).trim();
-
+            const condition = line.slice(5, line.indexOf(":")).trim();
             const loopBody = [];
             while (!this.code[++this.currentLine].trim().startsWith("stopmine")) {
                 loopBody.push(this.code[this.currentLine].trim());
             }
-
             while (this.evaluate(condition)) {
                 for (let loopLine of loopBody) {
                     this.processLine(loopLine);
@@ -85,37 +81,81 @@ class MCSInterpreter {
         }
 
         if (line.startsWith("craft ")) {
-            const funcName = line.match(/craft\s+(\w+)/)[1];
+            const match = line.match(/craft\s+(\w+)\s*(.*)/);
+            const funcName = match[1];
+            const args = match[2] ? match[2].split(" ").map(arg => arg.trim()) : [];
+        
             const funcBody = [];
             while (!this.code[++this.currentLine].trim().startsWith("crafted")) {
                 funcBody.push(this.code[this.currentLine].trim());
             }
-            this.functions[funcName] = funcBody;
+        
+            this.functions[funcName] = { body: funcBody, args };
+            return;
+        }
+        
+
+        if (line.startsWith("addmod ")) {
+            const fileName = line.match(/addmod\s+"(.+?)"/)?.[1];
+            if (!fileName) throw new Error("Invalid addmod path");
+            if (!this.fileSystem[fileName]) throw new Error(`File '${fileName}' not found.`);
+            const importedInterpreter = new MCSInterpreter(this.fileSystem[fileName], this.fileSystem);
+            importedInterpreter.run();
+            this.functions = { ...this.functions, ...importedInterpreter.functions };
             return;
         }
 
-        if (line in this.functions) {
-            this.runFunction(line);
+        const funcMatch = line.match(/^(\w+)\s*(.*)/);
+        if (funcMatch && this.functions[funcMatch[1]]) {
+            const [_, funcName, argStr] = funcMatch;
+            const argVals = argStr ? argStr.split(",").map(v => this.evaluate(v.trim())) : [];
+            this.runFunction(funcName, argVals);
             return;
         }
 
         throw new Error(`Unknown command: ${line}`);
     }
 
-    runFunction(funcName) {
-        const funcBody = this.functions[funcName];
-        for (let line of funcBody) this.processLine(line);
+    runFunction(funcName, args) {
+        const { body, args: paramNames } = this.functions[funcName];
+    
+        const prevVars = { ...this.variables };
+    
+        if (args.length !== paramNames.length) {
+            throw new Error(`Function '${funcName}' expects ${paramNames.length} arguments, got ${args.length}`);
+        }
+    
+        // Bind args into this.variables
+        paramNames.forEach((name, index) => {
+            this.variables[name] = args[index];
+        });
+    
+        for (let line of body) this.processLine(line);
+    
+        this.variables = prevVars;
     }
+    
+    
 
     evaluate(expression) {
         expression = expression.trim();
-
-        if (expression.startsWith('"') && expression.endsWith('"')) return expression.slice(1, -1);
+    
+        // If full expression is a simple string
+        if (expression.startsWith('"') && expression.endsWith('"') && !expression.includes('+')) {
+            return expression.slice(1, -1);
+        }
+    
+        // Handle + operator for strings and numbers
+        if (expression.includes("+")) {
+            const parts = expression.split("+").map(part => part.trim());
+            return parts.map(part => this.evaluate(part)).join("");
+        }
+    
         if (expression === "true") return true;
         if (expression === "false") return false;
         if (this.variables.hasOwnProperty(expression)) return this.variables[expression];
         if (!isNaN(expression)) return Number(expression);
-
+    
         const operators = ["==", "!=", "<=", ">=", "<", ">"];
         for (let op of operators) {
             if (expression.includes(op)) {
@@ -130,75 +170,19 @@ class MCSInterpreter {
                 }
             }
         }
-
-        const arithmeticOps = ["+", "-", "*", "/"];
+    
+        const arithmeticOps = ["-", "*", "/"];
         for (let op of arithmeticOps) {
             if (expression.includes(op)) {
                 const [left, right] = expression.split(op).map(part => part.trim());
                 switch (op) {
-                    case "+": return this.evaluate(left) + this.evaluate(right);
                     case "-": return this.evaluate(left) - this.evaluate(right);
                     case "*": return this.evaluate(left) * this.evaluate(right);
                     case "/": return this.evaluate(left) / this.evaluate(right);
                 }
             }
         }
-
+    
         throw new Error(`Unknown expression: ${expression}`);
     }
 }
-
-document.getElementById("import").addEventListener("click", () => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = ".mcslang";
-    input.addEventListener("change", (event) => {
-        const file = event.target.files[0];
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            document.getElementById("code").value = e.target.result;
-        };
-        reader.readAsText(file);
-    });
-    input.click();
-});
-
-document.getElementById("export").addEventListener("click", () => {
-    const code = document.getElementById("code").value;
-    const blob = new Blob([code], { type: "text/plain" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "untitled.mcslang";
-    link.click();
-});
-
-
-document.getElementById("run").addEventListener("click", () => {
-    const code = document.getElementById("code").value;
-    const interpreter = new MCSInterpreter(code);
-    try {
-        const result = interpreter.run();
-        document.getElementById("output").value = result;
-    } catch (e) {
-        document.getElementById("output").value = `Error: ${e.message}`;
-    }
-});
-
-const codeInput = document.getElementById("code");
-codeInput.addEventListener("keydown", (event) => {
-    if (event.key === "Enter") {
-        const lines = codeInput.value.split("\n");
-        const currentLine = lines[lines.length - 1];
-
-        if (currentLine.trim().startsWith("mine") || currentLine.trim().startsWith("craft")) {
-            event.preventDefault();
-            const cursorPosition = codeInput.selectionStart;
-            const indentation = "    ";
-            codeInput.value = 
-                codeInput.value.slice(0, cursorPosition) + 
-                "\n" + indentation + 
-                codeInput.value.slice(cursorPosition);
-            codeInput.selectionEnd = cursorPosition + indentation.length + 1;
-        }
-    }
-});
