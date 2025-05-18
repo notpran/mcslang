@@ -1,0 +1,73 @@
+:: MCSlang Example Script
+:: This script demonstrates all language features including the latest ones
+
+:: Basic output and math
+place "=== Starting MCSlang Test ==="
+place "Basic math: " + (5 + 10) 
+
+:: Interactive input
+sign player_name = "What's your player name?"
+sign level      :: Default prompt will be used
+place "Welcome, Level " + level + " player: " + player_name
+
+:: Variables (block) and Constants (ore)
+block health = 100
+ore MAX_HEALTH = 100
+ore CRITICAL_HP = 20
+place "Health: " + health + "/" + MAX_HEALTH
+
+:: Chests (Arrays)
+chest inventory = ["sword", "pickaxe", "apple"]
+place "Initial inventory: " + inventory
+place "Inventory size: " + inventory.length
+
+:: Store and Take from chest (Array operations)
+store inventory "diamond"
+place "Added diamond: " + inventory
+
+take inventory "apple"  :: Remove specific item
+place "Removed apple: " + inventory
+
+take inventory   :: Remove last item
+place "Removed last item: " + inventory
+
+:: String operations and methods
+block message = "  Hello Miner!  "
+place "String length: " + message.length
+
+:: Null value (void)
+block empty_slot = void
+execif empty_slot == void: place "Slot is empty!"
+
+:: Control structures with multiline
+execif health > CRITICAL_HP:
+    place "Health is good!"
+    place "Keep mining!"
+execelse
+    place "Health is critical!"
+    place "Eat something!"
+
+:: Loops with counters
+block counter = 0
+mine counter < 3:
+    place "Mining... " + counter
+    block counter = counter + 1
+stopmine
+
+:: Functions with multiple arguments
+craft calculate_damage weapon power level
+    block damage = 0
+    execif weapon == "sword": block damage = 10 * power
+    execif weapon == "pickaxe": block damage = 5 * power
+    block damage = damage * level
+    place "Weapon damage: " + damage
+crafted
+
+:: Call multiarg function
+calculate_damage "sword", 2, 1.5
+
+:: Use imported file
+addmod "tools_examplescript.mcslang"
+
+:: Call imported function
+mineblocks "Diamond"
