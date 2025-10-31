@@ -22,7 +22,7 @@ MCS stands for minecraft script. its a language sorta like python but its minecr
 **Statements**: Each statement or command is on **a new line**. <br>
 **Whitespace**: Extra whitespace is **allowed**, but commands should generally start at **the beginning of the line**.
 
-## Outputing text/printing - NEW!
+## Outputing text/printing
 
 Use the `place` command to display messages or variable values in the output area. Expressions within place can include **strings, variables/expressions, numbers, boolean values or a combination of these**.
 <br>
@@ -84,7 +84,7 @@ here, **variable_name** is the name of the constant (letters, numbers and unders
 ore version = "1.2"
 ore gravity = 9.8
 ```
-### Arrays - NEW!!
+### Arrays
 
 Define an array with `chest`. arrays are 'lists' within code
 
@@ -102,7 +102,7 @@ here, **array_name** is the name of the array (letters, numbers and underscores 
 chest inventory = ["diamond sword", "Waxed Lightly Weathered Cut Copper Stairs", "turtle_shell"] 
 ```
 
-#### Adding Items - NEW!
+#### Adding Items
 
 You can add items to arrays by using `store`
 
@@ -121,7 +121,7 @@ chest inventory = ["diamond sword", "Waxed Lightly Weathered Cut Copper Stairs",
 store inventory "elytra"
 ```
 
-#### Removing items - NEW!
+#### Removing items
 
 You can remove items in arrays by using `take`
 
@@ -223,7 +223,7 @@ mine cobble < 5:
 stopmine
 ```
 
-## Dialogs
+## Dialogs - NEW!!!
 
 Dialogs allow you to create interactive GUI popups with text and buttons, similar to Minecraft dialogs or simple game menus. Define a dialog with `dialog` and end them with `elog;`. Dialogs in mcslang are reuseable
 
