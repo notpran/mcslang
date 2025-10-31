@@ -1,5 +1,6 @@
 class MCSInterpreter {
-    constructor(code, fileSystem = {}) {
+
+    constructor(code, fileSystem = {}, options = {}) {
         this.code = code ? code.split("\n") : [];
         this.variables = {};
         this.constants = new Set();
@@ -10,24 +11,136 @@ class MCSInterpreter {
         this.lastExecifResult = false;
         this.waiting = null;
         this.paused = false;
+        this.traceEnabled = !!options.trace;
     }
 
-    run() {
-        while (this.currentLine < this.code.length && !this.paused) {
-            let line = this.code[this.currentLine].trim();
-            this.processLine(line);
-            this.currentLine++;
+    trace(msg) {
+        if (this.traceEnabled) {
+            // Append to output so the UI can show it
+            this.output += `TRACE: ${msg}\n`;
         }
-        if (this.paused) {
-            this.paused = false;
+    }
+
+
+    run() {
+        try {
+            this.trace(`run() enter; currentLine=${this.currentLine}`);
+            while (this.currentLine < this.code.length) {
+                let line = (this.code[this.currentLine] || "").trim();
+                this.trace(`line ${this.currentLine}: ${line}`);
+                this.processLine(line);
+                // If processLine set paused (dialog or input), return now and let the UI handle resume
+                if (this.paused) {
+                    this.trace(`paused at line ${this.currentLine}; waiting=${JSON.stringify(this.waiting)}`);
+                    return this.output.trim();
+                }
+                this.currentLine++;
+            }
+            this.trace(`run() finished; currentLine=${this.currentLine}`);
+            return this.output.trim();
+        } catch (e) {
+            this.output = `Error: ${e.message}`;
             return this.output;
         }
-        return this.output.trim();
     }
 
     processLine(line) {
+
         if (line === "" || line.startsWith("::")) return;
         if (line.includes("::")) line = line.split("::")[0].trim();
+
+        // Dialog block definition
+        if (line.startsWith("dialog ")) {
+            const match = line.match(/dialog\s+(\w+)\s*\(\)\s*:/);
+            if (!match) throw new Error("Invalid dialog declaration. Use: dialog name():");
+            const dialogName = match[1];
+            // Name conflict check
+            if ((this.functions && this.functions[dialogName]) || (this.variables && this.variables.hasOwnProperty(dialogName)) || (this.constants && this.constants.has(dialogName)) || (this.dialogs && this.dialogs[dialogName])) {
+                throw new Error(`NameError: '${dialogName}' already used as a function, variable, constant, or dialog`);
+            }
+            let dialogRows = [];
+            // Parse dialog block
+            const dialogBody = [];
+            let foundElog = false;
+            let dialogLineIdx = this.currentLine + 1;
+            while (dialogLineIdx < this.code.length) {
+                const dialogLine = this.code[dialogLineIdx].trim();
+                if (dialogLine.startsWith("elog;")) {
+                    foundElog = true;
+                    break;
+                }
+                dialogBody.push(dialogLine);
+                dialogLineIdx++;
+            }
+            if (!foundElog) throw new Error("Syntax error: missing 'elog;' after dialog block");
+            this.trace(`defined dialog '${dialogName}' lines ${this.currentLine + 1}-${dialogLineIdx - 1}`);
+            this.currentLine = dialogLineIdx + 1; // skip elog; line
+            for (let dialogLine of dialogBody) {
+                // Each dialog line is a row; collect all statements on the line
+                const statements = dialogLine.split(';').map(s => s.trim()).filter(Boolean);
+                if (statements.length === 0) continue;
+                const row = [];
+                for (let stmt of statements) {
+                    // Support: text "..." (new), text('...') (old)
+                    if (stmt.startsWith("text ")) {
+                        const textMatch = stmt.match(/^text\s+"([^"]+)"$/);
+                        if (textMatch) { row.push({ type: 'text', value: textMatch[1] }); continue; }
+                    }
+                    if (stmt.startsWith("text(")) {
+                        const textMatch = stmt.match(/text\(["'](.+)["']\)/);
+                        if (textMatch) { row.push({ type: 'text', value: textMatch[1] }); continue; }
+                    }
+                    // Support: button "...", "..." (new), button["...", ...] (old)
+                    if (stmt.startsWith("button ")) {
+                        const btnMatch = stmt.match(/^button\s+(("[^"]+"\s*,?\s*)+)$/);
+                        if (btnMatch) {
+                            const btns = btnMatch[1].split(',').map(b => b.trim().replace(/^"|"$/g, "")).filter(Boolean);
+                            row.push({ type: 'button', value: btns });
+                            continue;
+                        }
+                    }
+                    if (stmt.startsWith("button[")) {
+                        const btnMatch = stmt.match(/button\[(.*)\]/);
+                        if (btnMatch) {
+                            const btns = btnMatch[1].split(',').map(b => b.trim().replace(/^"|"$/g, "")).filter(Boolean);
+                            row.push({ type: 'button', value: btns });
+                            continue;
+                        }
+                    }
+                }
+                if (row.length > 0) dialogRows.push(row);
+            }
+            if (!this.dialogs) this.dialogs = {};
+            this.dialogs[dialogName] = { rows: dialogRows };
+            this.trace(`dialog '${dialogName}' parsed: ${JSON.stringify(dialogRows)}`);
+            return;
+        }
+
+        // Dialog invocation
+        const dialogCallMatch = line.match(/^(\w+)\(\);?$/);
+        if (dialogCallMatch && this.dialogs && this.dialogs[dialogCallMatch[1]]) {
+            const dialogName = dialogCallMatch[1];
+            // Name conflict check: dialog and function
+            if (this.functions && this.functions[dialogName]) {
+                throw new Error(`NameError: '${dialogName}' is both a dialog and a function`);
+            }
+            const rows = this.dialogs[dialogName].rows || [];
+            // ALL dialogs are non-blocking for now (don't pause execution)
+            this.waiting = {
+                type: "dialog",
+                rows: rows,
+                requiresResponse: false
+            };
+            this.trace(`invoked non-blocking dialog '${dialogName}'`);
+            return;
+        }
+
+        // Single command keyword handling
+        const trimmed = line.trim();
+        if (["place", "sign", "block", "ore", "chest", "store", "take", "execif", "execelse", "mine", "stopmine", "craft", "crafted", "addmod", "dialog"].includes(trimmed)) {
+            if (trimmed === "place") return; // do nothing for only 'place'
+            throw new Error(`Syntax error: incomplete or invalid usage of '${trimmed}'`);
+        }
 
         // Input handling with sign
         if (line.startsWith("sign ")) {
@@ -37,6 +150,8 @@ class MCSInterpreter {
             
             // Add the prompt to output
             this.output += prompt + "\n";
+
+            this.trace(`sign input requested for '${varName}' with prompt '${prompt}'; advanced currentLine to ${this.currentLine + 1}`);
             
             // Pause execution and wait for input
             this.waiting = {
@@ -45,6 +160,8 @@ class MCSInterpreter {
                 lastPrompt: prompt
             };
             this.paused = true;
+            // advance currentLine so sign statement isn't re-run after input is provided
+            this.currentLine++;
             return;
         }
 
@@ -53,6 +170,10 @@ class MCSInterpreter {
             const match = line.match(/chest\s+(\w+)\s*=\s*(.*)/);
             if (!match) throw new Error("Invalid chest declaration");
             const [_, varName, expression] = match;
+            // Name conflict check
+            if ((this.functions && this.functions[varName]) || (this.dialogs && this.dialogs[varName]) || (this.constants && this.constants.has(varName)) || (this.variables && this.variables.hasOwnProperty(varName))) {
+                throw new Error(`NameError: '${varName}' already used as a function, dialog, constant, or variable`);
+            }
             if (this.constants.has(varName)) throw new Error(`Cannot modify constant '${varName}'`);
             const value = this.evaluate(expression);
             if (!Array.isArray(value)) throw new Error("Chest must be initialized with an array");
@@ -100,6 +221,10 @@ class MCSInterpreter {
 
         if (line.startsWith("ore ")) {
             const [_, varName, expression] = line.match(/ore\s+(\w+)\s*=\s*(.*)/);
+            // Name conflict check
+            if ((this.functions && this.functions[varName]) || (this.dialogs && this.dialogs[varName]) || (this.variables && this.variables.hasOwnProperty(varName)) || (this.constants && this.constants.has(varName))) {
+                throw new Error(`NameError: '${varName}' already used as a function, dialog, variable, or constant`);
+            }
             if (this.variables[varName]) throw new Error(`Cannot redeclare constant '${varName}'`);
             this.variables[varName] = this.evaluate(expression);
             this.constants.add(varName);
@@ -108,6 +233,10 @@ class MCSInterpreter {
 
         if (line.startsWith("block ")) {
             const [_, varName, expression] = line.match(/block\s+(\w+)\s*=\s*(.*)/);
+            // Name conflict check
+            if ((this.functions && this.functions[varName]) || (this.dialogs && this.dialogs[varName]) || (this.constants && this.constants.has(varName)) || (this.variables && this.variables.hasOwnProperty(varName))) {
+                throw new Error(`NameError: '${varName}' already used as a function, dialog, constant, or variable`);
+            }
             if (this.constants.has(varName)) throw new Error(`Cannot modify constant '${varName}'`);
             this.variables[varName] = this.evaluate(expression);
             return;
@@ -153,13 +282,15 @@ class MCSInterpreter {
         if (line.startsWith("craft ")) {
             const match = line.match(/craft\s+(\w+)\s*(.*)/);
             const funcName = match[1];
-            const args = match[2] ? match[2].split(" ").map(arg => arg.trim()) : [];
-        
+            const args = match[2] ? match[2].split(" ").map(arg => arg.trim()).filter(Boolean) : [];
+            // Name conflict check
+            if ((this.dialogs && this.dialogs[funcName]) || (this.variables && this.variables.hasOwnProperty(funcName)) || (this.constants && this.constants.has(funcName)) || (this.functions && this.functions[funcName])) {
+                throw new Error(`NameError: '${funcName}' already used as a dialog, variable, constant, or function`);
+            }
             const funcBody = [];
             while (!this.code[++this.currentLine].trim().startsWith("crafted")) {
                 funcBody.push(this.code[this.currentLine].trim());
             }
-        
             this.functions[funcName] = { body: funcBody, args };
             return;
         }
@@ -169,7 +300,8 @@ class MCSInterpreter {
             const fileName = line.match(/addmod\s+"(.+?)"/)?.[1];
             if (!fileName) throw new Error("Invalid addmod path");
             if (!this.fileSystem[fileName]) throw new Error(`File '${fileName}' not found.`);
-            const importedInterpreter = new MCSInterpreter(this.fileSystem[fileName], this.fileSystem);
+            // Create imported interpreter without tracing
+            const importedInterpreter = new MCSInterpreter(this.fileSystem[fileName], this.fileSystem, { trace: false });
             importedInterpreter.run();
             this.functions = { ...this.functions, ...importedInterpreter.functions };
             return;
@@ -178,7 +310,14 @@ class MCSInterpreter {
         const funcMatch = line.match(/^(\w+)\s*(.*)/);
         if (funcMatch && this.functions[funcMatch[1]]) {
             const [_, funcName, argStr] = funcMatch;
-            const argVals = argStr ? argStr.split(",").map(v => this.evaluate(v.trim())) : [];
+            // Name conflict check: function and dialog
+            if (this.dialogs && this.dialogs[funcName]) {
+                throw new Error(`NameError: '${funcName}' is both a function and a dialog`);
+            }
+            let argVals = [];
+            if (argStr && argStr.trim() !== "") {
+                argVals = argStr.split(",").map(v => this.evaluate(v.trim()));
+            }
             this.runFunction(funcName, argVals);
             return;
         }
@@ -188,19 +327,12 @@ class MCSInterpreter {
 
     runFunction(funcName, args) {
         const { body, args: paramNames } = this.functions[funcName];
-    
         const prevVars = { ...this.variables };
-    
-        if (args.length !== paramNames.length) {
-            throw new Error(`Function '${funcName}' expects ${paramNames.length} arguments, got ${args.length}`);
+        // Allow missing arguments (set to void)
+        for (let i = 0; i < paramNames.length; i++) {
+            this.variables[paramNames[i]] = (args && args.length > i) ? args[i] : null;
         }
-    
-        paramNames.forEach((name, index) => {
-            this.variables[name] = args[index];
-        });
-    
         for (let line of body) this.processLine(line);
-    
         this.variables = prevVars;
     }
     

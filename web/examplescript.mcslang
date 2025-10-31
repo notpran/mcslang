@@ -1,3 +1,11 @@
+:: Dialogs (GUI popups)
+dialog greet():
+    text("Welcome to MCSlang dialog!")
+    button["OK", "Cancel"]
+elog;
+
+greet();
+
 :: MCSlang Example Script
 :: This script demonstrates all language features including the latest ones
 

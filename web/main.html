@@ -19,14 +19,17 @@
       <textarea id="code" placeholder="Write your MCS script here..." spellcheck="false"></textarea>
     </div>
 
-    <div id="controls">
-      <button id="newFile" class="btn">New File</button>
-      <button id="importFile" class="btn">Import File</button>
-      <button id="saveFile" class="btn">Save File</button>
-      <button id="run" class="btn primary">Run</button>
+    <div id="controls" style="margin-bottom: 0.5rem; gap: 0.25rem; justify-content: flex-start;">
+      <button id="newFile" class="btn" title="New File">＋</button>
+      <button id="importFile" class="btn" title="Import File">⭳</button>
+      <button id="saveFile" class="btn" title="Save File">💾</button>
+      <button id="run" class="btn primary" title="Run Script">▶</button>
     </div>
 
-    <textarea id="output" placeholder="Output will appear here..." readonly></textarea>
+    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+      <textarea id="output" placeholder="Output will appear here..." readonly style="flex: 2 1 300px; min-width: 200px;"></textarea>
+      <div id="dialog-area" style="flex: 1 1 200px; min-width: 180px; background: var(--bg-secondary); border-radius: 6px; border: 1px solid var(--border-color); padding: 1rem; display: none;"></div>
+    </div>
   </div>
 
   <script src="interpreter.js"></script>

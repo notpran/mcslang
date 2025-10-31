@@ -223,6 +223,33 @@ mine cobble < 5:
 stopmine
 ```
 
+## Dialogs
+
+Dialogs allow you to create interactive GUI popups with text and buttons, similar to Minecraft dialogs or simple game menus. Define a dialog with `dialog` and end them with `elog;`. Dialogs in mcslang are reuseable
+
+**Syntax:**
+
+```
+dialog dialog_name():
+    text("enter text here")
+    button["text"]
+elog;
+```
+
+here, **dialog_name** is the name of the dialog.
+
+**Example:**
+
+```
+dialog somdialog():
+    text "Some message"
+    button"Button1", "Button2"
+    text "Another message"; button"Button3"
+elog;
+
+somdialog();
+```
+
 ## Functions
 
 Define functions with `craft` and end them with `crafted`. Functions allow reusable code blocks and can be called by their names after definition.

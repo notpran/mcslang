@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>MCSLang Dialog</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    body { background: var(--bg-secondary); color: var(--text-primary); font-family: inherit; margin: 0; padding: 2em; }
+    #dialog-text { margin-bottom: 1.5em; font-size: 1.1em; }
+    .btn { margin-right: 0.5em; }
+  </style>
+</head>
+<body>
+  <div id="dialog-content"></div>
+  <script>
+    // Receive dialog data from opener
+    window.onload = function() {
+      if (window.opener && window.opener.__mcslangDialogData) {
+        const { rows } = window.opener.__mcslangDialogData;
+        const content = document.getElementById('dialog-content');
+
+  rows.forEach(row => {
+          // Each row is an array of statements (text/button), render side by side
+          const div = document.createElement('div');
+          div.style.display = 'flex';
+          div.style.alignItems = 'center';
+          div.style.gap = '1em';
+          div.style.marginBottom = '1em';
+          row.forEach(stmt => {
+            if (stmt.type === 'text') {
+              const t = document.createElement('span');
+              t.textContent = stmt.value;
+              div.appendChild(t);
+            } else if (stmt.type === 'button') {
+              const btnGroup = document.createElement('span');
+              stmt.value.forEach(btn => {
+                const b = document.createElement('button');
+                b.textContent = btn;
+                b.className = 'btn primary';
+                b.style.marginRight = '0.5em';
+                b.onclick = function() {
+                  // Send result back to opener and close the popup
+                  try {
+                    window.opener.postMessage({ type: 'mcslang-dialog-result', result: btn }, '*');
+                  } catch (e) {
+                    // ignore
+                  }
+                  // Do not close the dialog on button click; leave it open so user can continue interacting.
+                  // Disable primary buttons to avoid duplicate sends
+                  try {
+                    document.querySelectorAll('.btn.primary').forEach(b => b.disabled = true);
+                  } catch (e) {}
+                };
+                btnGroup.appendChild(b);
+              });
+              div.appendChild(btnGroup);
+            }
+          });
+          content.appendChild(div);
+        });
+      }
+    };
+  </script>
+</body>
+</html>

@@ -33,25 +33,28 @@ function createTab(name) {
 }
 
 function closeTab(name) {
-    delete fileSystem[name];
-    delete interpreters[name];  // Clean up the interpreter instance
-    localStorage.setItem("mcs-files", JSON.stringify(fileSystem));
+  if (!confirm(`Are you sure you want to delete '${name}'? This cannot be undone.`)) {
+    return;
+  }
+  delete fileSystem[name];
+  delete interpreters[name];  // Clean up the interpreter instance
+  localStorage.setItem("mcs-files", JSON.stringify(fileSystem));
     
-    const tab = Array.from(document.querySelectorAll(".tab")).find(
-        t => t.firstChild.textContent === name
-    );
-    if (tab) tab.remove();
+  const tab = Array.from(document.querySelectorAll(".tab")).find(
+    t => t.firstChild.textContent === name
+  );
+  if (tab) tab.remove();
     
-    if (currentFile === name) {
-        const remainingFiles = Object.keys(fileSystem);
-        if (remainingFiles.length > 0) {
-            switchTab(remainingFiles[0]);
-        } else {
-            currentFile = null;
-            document.getElementById("code").value = "";
-            document.getElementById("output").value = "";
-        }
+  if (currentFile === name) {
+    const remainingFiles = Object.keys(fileSystem);
+    if (remainingFiles.length > 0) {
+      switchTab(remainingFiles[0]);
+    } else {
+      currentFile = null;
+      document.getElementById("code").value = "";
+      document.getElementById("output").value = "";
     }
+  }
 }
 
 function switchTab(name) {
@@ -157,14 +160,187 @@ document.getElementById("run").addEventListener("click", () => {
   const output = document.getElementById("output");
   output.value = "";
   output.setAttribute("readonly", true);
-  
+
   // Create a new interpreter instance and store it
+  // Create interpreter instance (tracing disabled by default)
   interpreters[currentFile] = new MCSInterpreter(fileSystem[currentFile], fileSystem);
-  try {
-    const result = interpreters[currentFile].run();
-    output.value = result;
-    
-    // Make editable only if waiting for input
+    try {
+      const result = interpreters[currentFile].run();
+      // Prefer interpreter.output (it may contain accumulated output or an Error string).
+      output.value = (interpreters[currentFile].output || "").trim() || result || "";
+
+      // If there was an error, do not continue
+      if (output.value && output.value.startsWith('Error:')) {
+        return;
+      }
+
+    // Handle dialog in popup
+    if (interpreters[currentFile].waiting?.type === "dialog") {
+      const waitingDialog = interpreters[currentFile].waiting;
+      const startRows = waitingDialog.rows;
+
+      // If the dialog does not require a user response (no buttons), show it non-blocking and continue
+      if (!waitingDialog.requiresResponse) {
+        // Show non-blocking dialog (popup or inline) but do not pause execution
+        window.__mcslangDialogData = { rows: startRows };
+        const popup = window.open('dialog.html', 'mcslang-dialog', 'width=400,height=350');
+        if (!popup) {
+          // Render inline modal without buttons (non-blocking)
+          const modal = document.createElement('div');
+          modal.style.position = 'fixed';
+          modal.style.left = '0';
+          modal.style.top = '0';
+          modal.style.width = '100%';
+          modal.style.height = '100%';
+          modal.style.background = 'rgba(0,0,0,0.6)';
+          modal.style.display = 'flex';
+          modal.style.alignItems = 'center';
+          modal.style.justifyContent = 'center';
+          modal.style.zIndex = 9999;
+
+          const box = document.createElement('div');
+          box.style.background = 'var(--bg-primary)';
+          box.style.color = 'var(--text-primary)';
+          box.style.padding = '1.25em';
+          box.style.borderRadius = '8px';
+          box.style.maxWidth = '90%';
+          box.style.maxHeight = '80%';
+          box.style.overflow = 'auto';
+
+          startRows.forEach(row => {
+            const rowDiv = document.createElement('div');
+            rowDiv.style.display = 'flex';
+            rowDiv.style.gap = '0.75em';
+            rowDiv.style.marginBottom = '0.75em';
+            row.forEach(stmt => {
+              if (stmt.type === 'text') {
+                const t = document.createElement('div');
+                t.textContent = stmt.value;
+                rowDiv.appendChild(t);
+              }
+            });
+            box.appendChild(rowDiv);
+          });
+
+          modal.appendChild(box);
+          document.body.appendChild(modal);
+        }
+
+        // Clear waiting so editor won't try to resume for this dialog
+        interpreters[currentFile].waiting = null;
+        interpreters[currentFile].paused = false;
+        // Continue; nothing else to do for non-blocking dialog
+      } else {
+        const openDialogAndResume = (rows) => {
+          return new Promise((resolve) => {
+            window.__mcslangDialogData = { rows };
+            const popup = window.open('dialog.html', 'mcslang-dialog', 'width=400,height=350');
+
+            function onMessage(event) {
+              if (event.data && event.data.type === 'mcslang-dialog-result') {
+                // store result and clear waiting
+                interpreters[currentFile].variables.dialog_result = event.data.result;
+                interpreters[currentFile].waiting = null;
+                // Clear paused so the interpreter can resume when run() is called
+                interpreters[currentFile].paused = false;
+                window.removeEventListener('message', onMessage);
+
+                // Resume execution until next pause or end
+                let nextResult;
+                do {
+                  nextResult = interpreters[currentFile].run();
+                  // Prefer interpreter.output which may include Error or accumulated output
+                  output.value = (interpreters[currentFile].output || "").trim() || nextResult || "";
+                  if (output.value && output.value.startsWith('Error:')) {
+                    resolve(output.value);
+                    return;
+                  }
+                } while (!interpreters[currentFile].waiting && interpreters[currentFile].currentLine < interpreters[currentFile].code.length);
+
+                // If another dialog is requested, open it recursively
+                if (interpreters[currentFile].waiting?.type === 'dialog') {
+                  openDialogAndResume(interpreters[currentFile].waiting.rows).then(resolve);
+                  return;
+                }
+
+                resolve(nextResult);
+              }
+            }
+
+            // If popup blocked (popup === null), render an inline modal as a fallback
+            if (!popup) {
+              const modal = document.createElement('div');
+              modal.style.position = 'fixed';
+              modal.style.left = '0';
+              modal.style.top = '0';
+              modal.style.width = '100%';
+              modal.style.height = '100%';
+              modal.style.background = 'rgba(0,0,0,0.6)';
+              modal.style.display = 'flex';
+              modal.style.alignItems = 'center';
+              modal.style.justifyContent = 'center';
+              modal.style.zIndex = 9999;
+
+              const box = document.createElement('div');
+              box.style.background = 'var(--bg-primary)';
+              box.style.color = 'var(--text-primary)';
+              box.style.padding = '1.25em';
+              box.style.borderRadius = '8px';
+              box.style.maxWidth = '90%';
+              box.style.maxHeight = '80%';
+              box.style.overflow = 'auto';
+
+              rows.forEach(row => {
+                const rowDiv = document.createElement('div');
+                rowDiv.style.display = 'flex';
+                rowDiv.style.gap = '0.75em';
+                rowDiv.style.marginBottom = '0.75em';
+                row.forEach(stmt => {
+                  if (stmt.type === 'text') {
+                    const t = document.createElement('div');
+                    t.textContent = stmt.value;
+                    rowDiv.appendChild(t);
+                  } else if (stmt.type === 'button') {
+                    const btnGroup = document.createElement('div');
+                    stmt.value.forEach(btn => {
+                      const b = document.createElement('button');
+                      b.textContent = btn;
+                      b.className = 'btn primary';
+                      b.style.marginRight = '0.5em';
+                      b.onclick = function() {
+                        // Simulate message event (send result back) but do NOT close the modal
+                        try {
+                          onMessage({ data: { type: 'mcslang-dialog-result', result: btn } });
+                        } catch (e) {
+                          // ignore
+                        }
+                        // keep modal open; user can close it with the Close button
+                        // disable primary buttons to avoid duplicate sends
+                        try { box.querySelectorAll('.btn.primary').forEach(bi => bi.disabled = true); } catch (e) {}
+                      };
+                      btnGroup.appendChild(b);
+                    });
+                    rowDiv.appendChild(btnGroup);
+                  }
+                });
+                box.appendChild(rowDiv);
+              });
+
+              // Do not add a Close button; dialog remains until the user manually closes it (or the popup window)
+              modal.appendChild(box);
+              document.body.appendChild(modal);
+            } else {
+              window.addEventListener('message', onMessage);
+            }
+          });
+        };
+
+        openDialogAndResume(startRows).catch(err => {
+          output.value = `Error: ${err?.message || err}`;
+        });
+      }
+    }
+
     if (interpreters[currentFile].waiting?.type === "input") {
       output.removeAttribute("readonly");
     }
@@ -193,7 +369,9 @@ document.getElementById("output").addEventListener("keydown", (e) => {
         try {
             // Store the input and continue execution
             currentInterpreter.validateAndStoreInput(currentInterpreter.waiting.varName, input);
-            currentInterpreter.waiting = null;
+      currentInterpreter.waiting = null;
+      // Clear paused so run() will continue processing after input
+      currentInterpreter.paused = false;
             
             // Make output readonly again
             output.setAttribute("readonly", true);
@@ -203,7 +381,7 @@ document.getElementById("output").addEventListener("keydown", (e) => {
             
             // Run the interpreter to get next output
             const result = currentInterpreter.run();
-            output.value = result;
+            output.value = (currentInterpreter.output || "").trim() || result || "";
             
             // Make editable again if waiting for more input
             if (currentInterpreter.waiting?.type === "input") {
